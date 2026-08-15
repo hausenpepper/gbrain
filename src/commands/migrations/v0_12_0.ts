@@ -38,9 +38,34 @@ import { childGlobalFlags } from '../../core/cli-options.ts';
 
 // ── Phase A — Schema ────────────────────────────────────────
 
+function readCurrentSchemaVersion(): number | null {
+  try {
+    const raw = execSync('gbrain config get version', {
+      encoding: 'utf-8',
+      timeout: 30_000,
+      env: process.env,
+    });
+    const match = raw.match(/(?:^|\n)(\d+)\s*$/);
+    if (!match) return null;
+    const version = Number.parseInt(match[1], 10);
+    return Number.isFinite(version) ? version : null;
+  } catch {
+    return null;
+  }
+}
+
 async function phaseASchema(opts: OrchestratorOpts): Promise<OrchestratorPhaseResult> {
   if (opts.dryRun) return { name: 'schema', status: 'skipped', detail: 'dry-run' };
   try {
+    // This legacy orchestrator only needs schema v8-v10. Re-running the full
+    // modern migration stack on a v100+ brain also runs current shape-repair
+    // probes; on large Supabase brains those probes can hit the pooler's
+    // statement timeout and permanently wedge an otherwise-complete v0.12
+    // ledger entry. A current schema version proves this phase's prerequisite.
+    const current = readCurrentSchemaVersion();
+    if (current !== null && current >= 10) {
+      return { name: 'schema', status: 'complete', detail: `already_at_v${current}` };
+    }
     // 10-minute budget. Migrations v8/v9 dedup with helper-index should be sub-second
     // even on 80K-duplicate brains, but the outer wall-clock cap shouldn't be the
     // failure mode (the prior 60s ceiling tripped Garry's production upgrade).
@@ -253,6 +278,7 @@ export const v0_12_0: Migration = {
 
 /** Exported for unit tests. */
 export const __testing = {
+  readCurrentSchemaVersion,
   phaseASchema,
   phaseBConfigCheck,
   phaseCBackfillLinks,

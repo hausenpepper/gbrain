@@ -37,6 +37,7 @@ describe('v0.12.0 — Knowledge Graph auto-wire migration', () => {
   test('phase functions exported for unit testing', async () => {
     const { __testing } = await import('../src/commands/migrations/v0_12_0.ts');
     expect(typeof __testing.phaseASchema).toBe('function');
+    expect(typeof __testing.readCurrentSchemaVersion).toBe('function');
     expect(typeof __testing.phaseBConfigCheck).toBe('function');
     expect(typeof __testing.phaseCBackfillLinks).toBe('function');
     expect(typeof __testing.phaseDBackfillTimeline).toBe('function');
